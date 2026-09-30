@@ -9,6 +9,7 @@ let data = { projects: [], todos: [], logs: [], dataDir: "", exportFile: "" };
 const state = {
   view: "today",
   quickProject: "",
+  addingProject: false,
   todoFilter: "open",
   todoProject: "",
   logQuery: "",
@@ -109,9 +110,41 @@ function renderNav() {
 
 function renderQuickProjects() {
   const list = data.projects.includes(state.quickProject) ? data.projects : [...data.projects, state.quickProject];
-  $("#quick-projects").innerHTML = list.map((p) =>
+  const chips = list.map((p) =>
     `<button type="button" class="proj-chip" data-action="quick-project" data-p="${esc(p)}" aria-pressed="${p === state.quickProject}">${esc(p)}</button>`
-  ).join("");
+  );
+  // 清單裡沒有的專案：點「＋ 新專案」直接打名字。記下第一筆之後，knownProjects() 就會把它列進清單
+  chips.push(state.addingProject
+    ? `<input class="proj-input" id="q-new-project" placeholder="新專案名稱，Enter 確定" aria-label="新專案名稱" maxlength="30">`
+    : `<button type="button" class="proj-chip proj-add" data-action="add-project">＋ 新專案</button>`);
+  $("#quick-projects").innerHTML = chips.join("");
+  const input = $("#q-new-project");
+  if (input) {
+    input.addEventListener("keydown", onNewProjectKey);
+    input.addEventListener("blur", () => commitNewProject(input.value));
+    input.focus();
+  }
+}
+
+function onNewProjectKey(e) {
+  // 這個輸入框在「記一筆」表單裡，Enter 不能讓整張表單送出
+  if (e.key === "Enter") {
+    e.preventDefault();
+    commitNewProject(e.target.value);
+    $("#q-content").focus();
+  } else if (e.key === "Escape") {
+    e.preventDefault();
+    e.stopPropagation();
+    commitNewProject("");
+  }
+}
+
+function commitNewProject(raw) {
+  if (!state.addingProject) return; // blur 和 Enter 可能先後觸發，只處理一次
+  state.addingProject = false;
+  const name = raw.trim();
+  if (name) state.quickProject = name;
+  renderQuickProjects();
 }
 
 function renderToday() {
@@ -442,6 +475,7 @@ document.addEventListener("click", (e) => {
     case "edit-log": openLog(id); break;
     case "close-so": closeSO(); break;
     case "quick-project": state.quickProject = el.dataset.p; renderQuickProjects(); break;
+    case "add-project": state.addingProject = true; renderQuickProjects(); break;
     case "todo-filter": state.todoFilter = el.dataset.v; renderTodos(); break;
     case "todo-project": state.todoProject = el.dataset.p; renderTodos(); break;
     case "log-project": state.logProject = el.dataset.p; renderLogs(); break;

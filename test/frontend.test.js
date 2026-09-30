@@ -26,6 +26,7 @@ test("[hidden] 規則還在（畫面切換全靠它）", () => {
 
 test("app.js 用到的元素 id 在 index.html 裡都找得到", () => {
   const ids = new Set([...app.matchAll(/\$\("#([\w-]+)"\)/g)].map((m) => m[1]));
-  const missing = [...ids].filter((id) => !html.includes(`id="${id}"`));
+  // 動態產生的元素（例如「＋ 新專案」的輸入框）id 寫在 app.js 的樣板字串裡
+  const missing = [...ids].filter((id) => !html.includes(`id="${id}"`) && !app.includes(`id="${id}"`));
   assert.deepEqual(missing, []);
 });
