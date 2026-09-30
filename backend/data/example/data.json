@@ -1,0 +1,24 @@
+{
+  "_meta": {
+    "schemaVersion": "1.0",
+    "app": "個人工作日誌",
+    "note": "範例資料，內容是虛構的。clone 下來沒有設定 .env 時會用這份開機。"
+  },
+  "projects": ["專案A", "設備導入", "行政", "其他"],
+  "todos": [
+    { "id": 1, "created": "2026-09-01", "project": "設備導入", "content": "新設備操作 SOP 初稿", "status": "完成", "due": "2026-09-12", "done": "2026-09-11", "note": "已交給主管審閱", "updatedAt": null },
+    { "id": 2, "created": "2026-09-08", "project": "專案A", "content": "需求訪談紀錄整理", "status": "進行中", "due": "2026-10-09", "done": null, "note": "下一步：確認報表欄位", "updatedAt": null },
+    { "id": 3, "created": "2026-09-10", "project": "設備導入", "content": "備品清單確認", "status": "等待中", "due": null, "done": null, "note": "等供應商報價", "updatedAt": null },
+    { "id": 4, "created": "2026-09-15", "project": "行政", "content": "教育訓練簽到表歸檔", "status": "未開始", "due": "2026-09-19", "done": null, "note": "", "updatedAt": null },
+    { "id": 5, "created": "2026-09-16", "project": "其他", "content": "舊版表單改版", "status": "取消", "due": null, "done": null, "note": "改用新系統，不需要了", "updatedAt": null }
+  ],
+  "logs": [
+    { "id": 1, "date": "2026-09-01", "project": "設備導入", "content": "SOP 初稿－開機、關機流程", "start": null, "end": null, "note": "", "updatedAt": null },
+    { "id": 2, "date": "2026-09-02", "project": "設備導入", "content": "SOP 初稿－換線流程", "start": "09:00", "end": "11:30", "note": "", "updatedAt": null },
+    { "id": 3, "date": "2026-09-02", "project": "行政", "content": "週會", "start": "13:30", "end": "14:00", "note": "", "updatedAt": null },
+    { "id": 4, "date": "2026-09-08", "project": "專案A", "content": "需求訪談－現場主管", "start": "10:00", "end": "11:00", "note": "報表欄位還沒定案，明天再問一次", "updatedAt": null },
+    { "id": 5, "date": "2026-09-09", "project": "專案A", "content": "需求訪談－品保", "start": "14:00", "end": "15:00", "note": "", "updatedAt": null },
+    { "id": 6, "date": "2026-09-10", "project": "設備導入", "content": "備品清單整理", "start": "08:30", "end": "10:00", "note": "缺兩項料號，已詢價", "updatedAt": null },
+    { "id": 7, "date": "2026-09-11", "project": "設備導入", "content": "SOP 核稿、交付主管", "start": null, "end": null, "note": "", "updatedAt": null }
+  ]
+}
