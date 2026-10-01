@@ -1,0 +1,546 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>個人工作日誌</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  /* Layout：沿用「產線日誌」的側邊選單＋主內容；「今天」畫面左邊記錄、右邊待辦。
+     [hidden] 那條規則不能拿掉，畫面切換全靠它（見 CLAUDE.md） */
+  :root{
+    --page:#f9f9f7;
+    --surface:#fcfcfb;
+    --surface-raised:#ffffff;
+    --ink-1:#0b0b0b;
+    --ink-2:#52514e;
+    --ink-muted:#898781;
+    --line:#e1e0d9;
+    --line-strong:#c3c2b7;
+    --accent:#2a78d6;
+    --accent-2:#184f95;
+    --accent-ink:#ffffff;
+    --accent-wash:#e9f1fb;
+    --good:#0ca30c;
+    --good-ink:#0a7a0a;
+    --good-wash:#e6f4e6;
+    --warning-ink:#8a5a00;
+    --warning-wash:#fdf1d6;
+    --critical:#d03b3b;
+    --critical-wash:#fbeaea;
+    --scrim:rgba(10,10,10,0.32);
+    --shadow:0 12px 32px -12px rgba(20,20,18,0.18), 0 2px 8px -2px rgba(20,20,18,0.10);
+    --font-sans:"Noto Sans TC","Segoe UI",system-ui,-apple-system,sans-serif;
+    --font-mono:"IBM Plex Mono","Noto Sans TC",ui-monospace,Consolas,monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      color-scheme:dark;
+      --page:#0d0d0d; --surface:#1a1a19; --surface-raised:#212120;
+      --ink-1:#ffffff; --ink-2:#c3c2b7; --ink-muted:#898781;
+      --line:#2c2c2a; --line-strong:#383835;
+      --accent:#3987e5; --accent-2:#86b6ef; --accent-ink:#0b0b0b; --accent-wash:#132538;
+      --good:#3fbf3f; --good-ink:#7fd67f; --good-wash:#15301a;
+      --warning-ink:#f5c451; --warning-wash:#33280f;
+      --critical:#e66767; --critical-wash:#3a1c1c;
+      --scrim:rgba(0,0,0,0.55);
+      --shadow:0 12px 32px -12px rgba(0,0,0,0.6), 0 2px 8px -2px rgba(0,0,0,0.4);
+    }
+  }
+  :root[data-theme="dark"]{
+    color-scheme:dark;
+    --page:#0d0d0d; --surface:#1a1a19; --surface-raised:#212120;
+    --ink-1:#ffffff; --ink-2:#c3c2b7; --ink-muted:#898781;
+    --line:#2c2c2a; --line-strong:#383835;
+    --accent:#3987e5; --accent-2:#86b6ef; --accent-ink:#0b0b0b; --accent-wash:#132538;
+    --good:#3fbf3f; --good-ink:#7fd67f; --good-wash:#15301a;
+    --warning-ink:#f5c451; --warning-wash:#33280f;
+    --critical:#e66767; --critical-wash:#3a1c1c;
+    --scrim:rgba(0,0,0,0.55);
+    --shadow:0 12px 32px -12px rgba(0,0,0,0.6), 0 2px 8px -2px rgba(0,0,0,0.4);
+  }
+
+  *{ box-sizing:border-box; }
+  [hidden]{ display:none !important; }
+  body{ margin:0; background:var(--page); color:var(--ink-1); font-family:var(--font-sans); font-size:14px; line-height:1.5; }
+  h1,h2,h3{ margin:0; text-wrap:balance; }
+  p{ margin:0; }
+  button,input,select,textarea{ font:inherit; color:inherit; }
+  button{ cursor:pointer; }
+  :focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+  .mono{ font-family:var(--font-mono); font-variant-numeric:tabular-nums; }
+  .muted{ color:var(--ink-muted); }
+  .icon{ width:1em; height:1em; stroke:currentColor; fill:none; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; flex:none; display:inline-block; vertical-align:-0.15em; }
+
+  .app{ display:flex; min-height:100dvh; max-width:1240px; margin:0 auto; }
+
+  /* ---------- Sidebar ---------- */
+  .sidebar{
+    width:216px; flex:none; border-right:1px solid var(--line);
+    padding:20px 14px; display:flex; flex-direction:column; gap:18px;
+    position:sticky; top:env(safe-area-inset-top,0px); align-self:flex-start; height:100dvh;
+  }
+  .brand{ display:flex; align-items:center; gap:10px; padding:4px 8px 12px; border-bottom:1px solid var(--line); }
+  .brand-mark{
+    width:34px; height:34px; border-radius:9px; flex:none;
+    background:linear-gradient(155deg, var(--accent), #184f95);
+    display:flex; align-items:center; justify-content:center; color:#fff;
+  }
+  .brand-mark .icon{ width:18px; height:18px; }
+  .brand-name{ font-weight:900; font-size:15px; letter-spacing:.2px; }
+  .brand-sub{ font-size:11px; color:var(--ink-muted); margin-top:1px; }
+  .nav{ display:flex; flex-direction:column; gap:3px; }
+  .nav-btn{
+    display:flex; align-items:center; gap:10px; width:100%;
+    padding:9px 10px; border-radius:9px; border:none; background:transparent;
+    color:var(--ink-2); font-size:13.5px; font-weight:500; text-align:left;
+  }
+  .nav-btn .icon{ width:17px; height:17px; color:var(--ink-muted); }
+  .nav-btn:hover{ background:var(--surface-raised); color:var(--ink-1); }
+  .nav-btn.active{ background:var(--accent-wash); color:var(--accent); font-weight:700; }
+  .nav-btn.active .icon{ color:var(--accent); }
+  .nav-badge{ margin-left:auto; font-size:10px; font-weight:800; background:var(--critical); color:#fff; border-radius:100px; padding:1px 6px; line-height:1.5; }
+  .sidebar-foot{ margin-top:auto; padding-top:14px; border-top:1px solid var(--line); display:flex; flex-direction:column; gap:12px; }
+  .foot-path{ display:flex; gap:6px; font-size:11px; color:var(--ink-muted); line-height:1.6; }
+  .foot-path .icon{ width:13px; height:13px; margin-top:2px; }
+
+  /* ---------- Main ---------- */
+  main{ flex:1; min-width:0; padding:22px 28px 60px; }
+  /* 連不到伺服器時的提示（例如 start.bat 的視窗被關掉） */
+  .load-error{
+    display:flex; gap:8px; align-items:flex-start;
+    font-size:12.5px; color:var(--critical); line-height:1.6;
+    background:var(--critical-wash); border-radius:10px; padding:10px 12px; margin-bottom:18px;
+  }
+  .load-error .icon{ width:15px; height:15px; margin-top:3px; }
+  .view{ display:flex; flex-direction:column; gap:16px; }
+  .topbar{ display:flex; align-items:flex-end; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+  .topbar h1{ font-size:22px; font-weight:900; }
+  .topbar h1 .dow{ font-weight:500; color:var(--ink-2); font-size:17px; }
+  .topbar .desc{ font-size:12.5px; color:var(--ink-muted); margin-top:3px; }
+
+  .card{ background:var(--surface-raised); border:1px solid var(--line); border-radius:14px; padding:16px 18px; min-width:0; }
+  .card-head{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px; }
+  .card-title{ font-size:13.5px; font-weight:800; }
+  .card-note{ font-size:11.5px; color:var(--ink-muted); }
+
+  .btn{
+    display:inline-flex; align-items:center; justify-content:center; gap:6px;
+    border-radius:9px; padding:8px 16px; font-size:13px; font-weight:700;
+    border:1px solid var(--line-strong); background:transparent; color:var(--ink-1);
+  }
+  .btn:hover{ border-color:var(--ink-muted); }
+  .btn .icon{ width:15px; height:15px; }
+  .btn-primary{ background:var(--accent); border-color:var(--accent); color:var(--accent-ink); }
+  .btn-primary:hover{ filter:brightness(1.07); border-color:var(--accent); }
+  .btn-sm{ padding:5px 10px; font-size:12px; border-radius:8px; }
+  .btn-block{ width:100%; }
+  .btn-danger{ color:var(--critical); border-color:transparent; padding-inline:8px; }
+  .btn-danger.armed{ background:var(--critical); color:#fff; border-color:var(--critical); padding-inline:14px; }
+  .link-btn{ border:none; background:none; padding:0; font-size:12px; font-weight:700; color:var(--accent); }
+  .link-btn:hover{ text-decoration:underline; }
+
+  /* ---------- Today ---------- */
+  .today-grid{ display:grid; grid-template-columns:minmax(0,1.45fr) minmax(0,1fr); gap:16px; align-items:start; }
+  .stack{ display:flex; flex-direction:column; gap:16px; min-width:0; }
+  .quick{ display:flex; flex-direction:column; gap:12px; }
+  .chip-row{ display:flex; flex-wrap:wrap; gap:6px; }
+  .proj-chip{
+    border:1px solid var(--line); background:var(--surface); color:var(--ink-2);
+    font-size:12px; font-weight:600; padding:5px 12px; border-radius:100px;
+  }
+  .proj-chip:hover{ border-color:var(--line-strong); color:var(--ink-1); }
+  .proj-chip[aria-pressed="true"]{ border-color:var(--accent); background:var(--accent-wash); color:var(--accent); font-weight:700; }
+  .proj-add{ border-style:dashed; background:transparent; color:var(--ink-muted); }
+  .proj-add:hover{ border-color:var(--accent); color:var(--accent); }
+  .proj-input{
+    border:1px solid var(--accent); background:var(--surface); border-radius:100px;
+    padding:5px 12px; font-size:12px; outline:none; width:13em; max-width:100%;
+  }
+  .text-input{
+    width:100%; border:1px solid var(--line-strong); background:var(--surface);
+    border-radius:9px; padding:8px 11px; font-size:13px; outline:none;
+  }
+  .text-input:focus{ border-color:var(--accent); }
+  .text-input.big{ font-size:15px; padding:11px 12px; border-radius:10px; }
+  .quick-row{ display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+  .quick-row .text-input{ flex:1 1 200px; min-width:0; }
+  .inline-field{ display:flex; align-items:center; gap:6px; font-size:12px; font-weight:700; color:var(--ink-2); }
+  .inline-field input{
+    border:1px solid var(--line-strong); background:var(--surface); border-radius:8px;
+    padding:6px 8px; font-size:12.5px; outline:none; font-family:var(--font-mono); font-variant-numeric:tabular-nums;
+  }
+  .inline-field input:focus{ border-color:var(--accent); }
+  .inline-field .sep{ color:var(--ink-muted); font-weight:400; }
+  .quick-foot{ display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+
+  .timeline{ list-style:none; margin:0; padding:0; }
+  .log-row{
+    display:grid; grid-template-columns:96px minmax(0,1fr) auto; gap:12px; align-items:start;
+    padding:10px 8px; border-top:1px solid var(--line); cursor:pointer;
+  }
+  .log-row:first-child{ border-top:none; }
+  .log-row:hover{ background:var(--accent-wash); }
+  .log-time{ font-size:12.5px; font-weight:500; padding-top:2px; white-space:nowrap; }
+  .log-time .to{ color:var(--ink-muted); }
+  .log-time.none{ color:var(--ink-muted); }
+  .log-content{ font-size:13.5px; font-weight:500; overflow-wrap:anywhere; }
+  .log-note{ font-size:12px; color:var(--ink-2); margin-top:3px; overflow-wrap:anywhere; }
+  .log-note::before{ content:"問題／明日："; color:var(--ink-muted); }
+  .proj-tag{
+    display:inline-block; font-size:11px; font-weight:700; padding:2px 8px; border-radius:6px;
+    background:var(--surface); border:1px solid var(--line); color:var(--ink-2); white-space:nowrap;
+  }
+  .empty{ list-style:none; padding:22px 8px; text-align:center; color:var(--ink-muted); font-size:12.5px; }
+
+  .todo-summary{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px; }
+  .todo-mini{ list-style:none; margin:0; padding:0; }
+  .todo-item{
+    display:grid; grid-template-columns:22px minmax(0,1fr) auto; gap:10px; align-items:start;
+    padding:11px 2px; border-top:1px solid var(--line);
+  }
+  .todo-item:first-child{ border-top:none; }
+  .todo-main{ cursor:pointer; min-width:0; }
+  .todo-main:hover .todo-content{ color:var(--accent); }
+  .todo-content{ font-size:13.5px; font-weight:600; overflow-wrap:anywhere; }
+  .todo-meta{ display:flex; flex-wrap:wrap; gap:6px; margin-top:5px; align-items:center; }
+  .todo-note{ font-size:12px; color:var(--ink-muted); margin-top:4px; overflow-wrap:anywhere; }
+
+  .check{
+    width:20px; height:20px; border-radius:50%; padding:0; margin-top:1px;
+    border:1.6px solid var(--line-strong); background:var(--surface-raised);
+    display:grid; place-items:center; color:transparent;
+  }
+  .check:hover{ border-color:var(--good); color:var(--good); }
+  .check .icon{ width:12px; height:12px; stroke-width:2.6; }
+  .check.is-done{ background:var(--good-wash); border-color:transparent; color:var(--good-ink); cursor:default; }
+  .check.is-cancel{ border-style:dashed; color:transparent; cursor:default; }
+
+  .pill{
+    display:inline-flex; align-items:center; gap:5px; white-space:nowrap;
+    font-size:11px; font-weight:700; padding:2px 8px; border-radius:100px;
+    background:var(--surface); color:var(--ink-2); border:1px solid var(--line);
+  }
+  .pill .dot{ width:6px; height:6px; border-radius:50%; background:currentColor; }
+  .pill.doing{ background:var(--accent-wash); color:var(--accent); border-color:transparent; }
+  .pill.wait{ background:var(--warning-wash); color:var(--warning-ink); border-color:transparent; }
+  .pill.done{ background:var(--good-wash); color:var(--good-ink); border-color:transparent; }
+  .pill.cancel{ color:var(--ink-muted); }
+  .pill.overdue{ background:var(--critical-wash); color:var(--critical); border-color:transparent; }
+  .pill.due{ font-family:var(--font-mono); font-weight:500; }
+
+  /* ---------- Filters ---------- */
+  .filter-bar{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .seg{ display:inline-flex; gap:3px; background:var(--surface); border:1px solid var(--line); border-radius:100px; padding:3px; }
+  .seg button{ border:none; background:transparent; color:var(--ink-2); font-size:12px; font-weight:700; padding:6px 14px; border-radius:100px; }
+  .seg button[aria-pressed="true"]{ background:var(--accent); color:var(--accent-ink); }
+  .seg .n{ font-family:var(--font-mono); font-weight:500; opacity:.8; margin-left:3px; }
+  .select-chip{
+    font-size:12px; font-weight:600; color:var(--ink-2); background:var(--surface-raised);
+    border:1px solid var(--line); border-radius:100px; padding:6px 12px;
+  }
+  .select-chip[aria-pressed="true"]{ border-color:var(--accent); color:var(--accent); background:var(--accent-wash); }
+  .search{
+    display:flex; align-items:center; gap:7px; flex:1 1 220px; min-width:0;
+    border:1px solid var(--line); background:var(--surface-raised); border-radius:9px; padding:7px 11px;
+  }
+  .search .icon{ width:15px; height:15px; color:var(--ink-muted); }
+  .search input{ border:none; outline:none; background:transparent; font-size:13px; width:100%; min-width:0; }
+  .spacer{ flex:1; }
+
+  /* ---------- Todo table ---------- */
+  .table-card{ padding:0; overflow:hidden; }
+  .table-scroll{ overflow-x:auto; }
+  table{ width:100%; border-collapse:collapse; min-width:640px; }
+  thead th{
+    text-align:left; font-size:11px; font-weight:700; color:var(--ink-muted); letter-spacing:.04em;
+    padding:10px 12px; border-bottom:1px solid var(--line); white-space:nowrap;
+  }
+  tbody td{ padding:11px 12px; border-bottom:1px solid var(--line); font-size:13px; vertical-align:top; }
+  tbody tr{ cursor:pointer; }
+  tbody tr:hover{ background:var(--accent-wash); }
+  tbody tr:last-child td{ border-bottom:none; }
+  td.c-check{ width:40px; padding-right:0; }
+  .t-content{ font-weight:600; overflow-wrap:anywhere; }
+  .t-note{ font-size:12px; color:var(--ink-muted); margin-top:3px; }
+  tr.closed .t-content, tr.closed td{ color:var(--ink-muted); }
+  tr.closed .t-content{ font-weight:500; }
+  tr.cancel .t-content{ text-decoration:line-through; }
+  td.date{ font-family:var(--font-mono); font-variant-numeric:tabular-nums; font-size:12.5px; white-space:nowrap; }
+  .legend{ display:flex; flex-wrap:wrap; gap:14px; font-size:11.5px; color:var(--ink-muted); }
+  .legend span{ display:inline-flex; align-items:center; gap:6px; }
+  .legend i{ width:9px; height:9px; border-radius:50%; display:inline-block; }
+
+  /* ---------- Log history ---------- */
+  .day-group + .day-group{ margin-top:18px; }
+  .day-head{ display:flex; align-items:baseline; gap:6px; padding:0 8px 6px; border-bottom:1px solid var(--line-strong); }
+  .day-date{ font-family:var(--font-mono); font-size:15px; font-weight:600; font-variant-numeric:tabular-nums; }
+  .day-dow{ font-size:12.5px; color:var(--ink-2); }
+  .day-count{ margin-left:auto; font-size:11.5px; color:var(--ink-muted); }
+  .day-group.is-today .day-date{ color:var(--accent); }
+
+  /* ---------- Slide-over ---------- */
+  .scrim{ position:fixed; inset:0; background:var(--scrim); z-index:40; opacity:0; pointer-events:none; transition:opacity .18s; }
+  .scrim.open{ opacity:1; pointer-events:auto; }
+  .slideover{
+    position:fixed; top:0; right:0; height:100dvh; width:min(420px,100%);
+    background:var(--surface-raised); border-left:1px solid var(--line); z-index:41; box-shadow:var(--shadow);
+    transform:translateX(100%); transition:transform .22s ease; visibility:hidden;
+    display:flex; flex-direction:column;
+    padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+  }
+  .slideover.open{ transform:translateX(0); visibility:visible; }
+  .so-head{ display:flex; align-items:center; justify-content:space-between; padding:16px 18px; border-bottom:1px solid var(--line); }
+  .so-head h2{ font-size:15px; font-weight:800; }
+  .icon-btn{ width:30px; height:30px; border-radius:8px; border:1px solid var(--line); background:var(--surface); display:flex; align-items:center; justify-content:center; color:var(--ink-2); padding:0; }
+  .icon-btn:hover{ color:var(--ink-1); border-color:var(--line-strong); }
+  .icon-btn .icon{ width:15px; height:15px; }
+  .so-body{ padding:18px; overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:14px; }
+  .so-foot{ display:flex; align-items:center; gap:8px; padding:14px 18px; border-top:1px solid var(--line); }
+  .field{ display:flex; flex-direction:column; gap:6px; min-width:0; }
+  .field label{ font-size:12px; font-weight:700; color:var(--ink-2); }
+  .field .hint{ font-size:11px; color:var(--ink-muted); font-weight:400; margin-left:4px; }
+  .field input, .field select, .field textarea{
+    border:1px solid var(--line-strong); background:var(--surface); border-radius:9px;
+    padding:8px 11px; font-size:13px; outline:none; width:100%; min-width:0;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus{ border-color:var(--accent); }
+  .field textarea{ resize:vertical; min-height:64px; }
+  .field-row{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+
+  /* ---------- Toast ---------- */
+  .toast{
+    position:fixed; left:50%; bottom:calc(22px + env(safe-area-inset-bottom,0px)); z-index:50;
+    transform:translate(-50%,12px); opacity:0; pointer-events:none; transition:all .22s;
+    background:var(--ink-1); color:var(--page); font-size:12.5px; font-weight:600;
+    padding:9px 10px 9px 16px; border-radius:100px; display:flex; align-items:center; gap:12px;
+    max-width:calc(100vw - 32px);
+  }
+  .toast.show{ opacity:1; transform:translate(-50%,0); pointer-events:auto; }
+  .toast-msg{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+  .toast button{ border:none; background:var(--page); color:var(--ink-1); font-size:12px; font-weight:800; padding:4px 10px; border-radius:100px; flex:none; }
+
+  @media (prefers-reduced-motion: reduce){
+    .slideover, .scrim, .toast{ transition:none; }
+  }
+
+  /* ---------- Responsive ---------- */
+  @media (max-width: 960px){
+    .today-grid{ grid-template-columns:minmax(0,1fr); }
+  }
+  @media (max-width: 720px){
+    .app{ flex-direction:column; }
+    .sidebar{
+      width:100%; height:auto; z-index:30; background:var(--page);
+      flex-direction:row; align-items:center; gap:10px; padding:10px 16px;
+      border-right:none; border-bottom:1px solid var(--line);
+    }
+    .brand{ border-bottom:none; padding:0; }
+    .brand-text{ display:none; }
+    .nav{ flex-direction:row; overflow-x:auto; gap:4px; }
+    .nav-btn{ width:auto; white-space:nowrap; padding:8px 10px; }
+    .sidebar-foot{ display:none; }
+    main{ padding:16px 16px 50px; }
+  }
+  @media (max-width: 520px){
+    .log-row{ grid-template-columns:minmax(0,1fr) auto; gap:4px 10px; }
+    .log-time{ grid-column:1; grid-row:1; }
+    .log-row .proj-tag{ grid-column:2; grid-row:1; }
+    .log-body{ grid-column:1 / -1; }
+    .field-row{ grid-template-columns:1fr; }
+  }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M6.3 17.7l-1.4 1.4M19.1 4.9l-1.4 1.4"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M3 17l2 2 4-4M3 7l2 2 4-4M13 6h8M13 12h8M13 18h8"/></symbol>
+  <symbol id="i-book" viewBox="0 0 24 24"><path d="M2 4h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H2zM22 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7z"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></symbol>
+  <symbol id="i-note" viewBox="0 0 24 24"><path d="M5 3h11l3 3v15H5z"/><path d="M9 9h6M9 13h6M9 17h3"/></symbol>
+</svg>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark"><svg class="icon"><use href="#i-note"/></svg></div>
+      <div class="brand-text">
+        <div class="brand-name">個人工作日誌</div>
+        <div class="brand-sub">待辦 ＋ 每日紀錄</div>
+      </div>
+    </div>
+    <nav class="nav" aria-label="主選單">
+      <button class="nav-btn active" data-goto="today"><svg class="icon"><use href="#i-sun"/></svg>今天</button>
+      <button class="nav-btn" data-goto="todos"><svg class="icon"><use href="#i-list"/></svg>待辦<span class="nav-badge" id="nav-badge" hidden></span></button>
+      <button class="nav-btn" data-goto="logs"><svg class="icon"><use href="#i-book"/></svg>日誌</button>
+    </nav>
+    <div class="sidebar-foot">
+      <button class="btn btn-sm btn-block" data-action="export"><svg class="icon"><use href="#i-download"/></svg>匯出 Excel</button>
+      <div class="foot-path"><svg class="icon"><use href="#i-folder"/></svg><span id="data-path">讀取中…</span></div>
+    </div>
+  </aside>
+
+  <main>
+    <p class="load-error" id="load-error" hidden><svg class="icon"><use href="#i-info"/></svg><span id="load-error-msg"></span></p>
+
+    <!-- ========== 今天 ========== -->
+    <section class="view" id="view-today">
+      <header class="topbar">
+        <div>
+          <h1 id="today-title"></h1>
+          <p class="desc" id="today-desc"></p>
+        </div>
+      </header>
+      <div class="today-grid">
+        <div class="stack">
+          <form class="card quick" id="quick-form" autocomplete="off">
+            <div class="card-head" style="margin-bottom:0">
+              <h2 class="card-title">記一筆</h2>
+              <span class="card-note">按 Enter 送出</span>
+            </div>
+            <div class="chip-row" id="quick-projects" role="group" aria-label="專案"></div>
+            <input class="text-input big" id="q-content" placeholder="做了什麼？例如：裝/烘模-F3、F4" aria-label="工作內容">
+            <div class="quick-row">
+              <div class="inline-field">
+                <span>時段</span>
+                <input type="time" id="q-start" aria-label="開始時間">
+                <span class="sep">–</span>
+                <input type="time" id="q-end" aria-label="結束時間">
+              </div>
+              <input class="text-input" id="q-note" placeholder="問題／明日計畫（選填）" aria-label="問題／明日計畫">
+            </div>
+            <div class="quick-foot">
+              <label class="inline-field">日期 <input type="date" id="q-date"></label>
+              <button class="btn btn-primary" type="submit" id="q-submit">記下</button>
+            </div>
+          </form>
+
+          <section class="card">
+            <div class="card-head">
+              <h2 class="card-title">今天的紀錄</h2>
+              <span class="card-note">依時段排序，點一下可修改</span>
+            </div>
+            <ol class="timeline" id="today-logs"></ol>
+          </section>
+        </div>
+
+        <section class="card">
+          <div class="card-head">
+            <h2 class="card-title">還沒完成的待辦</h2>
+            <button class="btn btn-sm" data-action="new-todo"><svg class="icon"><use href="#i-plus"/></svg>新增</button>
+          </div>
+          <div class="todo-summary" id="todo-summary"></div>
+          <ul class="todo-mini" id="today-todos"></ul>
+          <div style="margin-top:8px"><button class="link-btn" data-goto="todos">看全部待辦 →</button></div>
+        </section>
+      </div>
+    </section>
+
+    <!-- ========== 待辦 ========== -->
+    <section class="view" id="view-todos" hidden>
+      <header class="topbar">
+        <div>
+          <h1>待辦</h1>
+          <p class="desc">一件事一列，狀態變了就改。改成「完成」會自動填完成日。</p>
+        </div>
+        <button class="btn btn-primary" data-action="new-todo"><svg class="icon"><use href="#i-plus"/></svg>新增待辦</button>
+      </header>
+      <div class="filter-bar">
+        <div class="seg" id="todo-seg" role="group" aria-label="狀態篩選"></div>
+        <div class="chip-row" id="todo-projects" role="group" aria-label="專案篩選"></div>
+      </div>
+      <div class="card table-card">
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th></th><th>內容／備註</th><th>專案</th><th>狀態</th><th>期限</th><th>建立日</th><th>完成日</th></tr></thead>
+            <tbody id="todo-rows"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="legend">
+        <span><i style="background:var(--critical)"></i>逾期未完成</span>
+        <span><i style="background:var(--warning-ink)"></i>等待中</span>
+        <span><i style="background:var(--ink-muted)"></i>完成／取消變灰</span>
+        <span>（跟 Excel 條件格式同一套規則）</span>
+      </div>
+    </section>
+
+    <!-- ========== 日誌 ========== -->
+    <section class="view" id="view-logs" hidden>
+      <header class="topbar">
+        <div>
+          <h1>日誌</h1>
+          <p class="desc" id="log-desc"></p>
+        </div>
+      </header>
+      <div class="filter-bar">
+        <label class="search"><svg class="icon"><use href="#i-search"/></svg><input id="log-search" placeholder="搜尋工作內容，例如 G5、SOP、月保養" aria-label="搜尋日誌"></label>
+        <div class="chip-row" id="log-projects" role="group" aria-label="專案篩選"></div>
+      </div>
+      <div class="card" id="log-days"></div>
+    </section>
+  </main>
+</div>
+
+<!-- ========== 編輯側欄 ========== -->
+<div class="scrim" id="scrim" data-action="close-so"></div>
+<aside class="slideover" id="so" aria-labelledby="so-title" role="dialog">
+  <div class="so-head">
+    <h2 id="so-title">編輯</h2>
+    <button class="icon-btn" data-action="close-so" aria-label="關閉"><svg class="icon"><use href="#i-x"/></svg></button>
+  </div>
+
+  <form class="so-body" id="todo-form" autocomplete="off">
+    <div class="field"><label for="t-content">內容</label><input id="t-content" required></div>
+    <div class="field-row">
+      <div class="field"><label for="t-project">專案</label><input id="t-project" list="proj-list"></div>
+      <div class="field"><label for="t-status">狀態</label><select id="t-status"></select></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label for="t-due">期限<span class="hint">選填</span></label><input type="date" id="t-due"></div>
+      <div class="field"><label for="t-created">建立日</label><input type="date" id="t-created"></div>
+    </div>
+    <div class="field"><label for="t-done">完成日<span class="hint">改成「完成」時自動填今天</span></label><input type="date" id="t-done"></div>
+    <div class="field"><label for="t-note">備註（卡關／下一步）</label><textarea id="t-note"></textarea></div>
+  </form>
+
+  <form class="so-body" id="log-form" autocomplete="off" hidden>
+    <div class="field-row">
+      <div class="field"><label for="l-date">日期</label><input type="date" id="l-date" required></div>
+      <div class="field"><label for="l-project">專案</label><input id="l-project" list="proj-list"></div>
+    </div>
+    <div class="field"><label for="l-content">工作內容</label><textarea id="l-content" required></textarea></div>
+    <div class="field-row">
+      <div class="field"><label for="l-start">開始</label><input type="time" id="l-start"></div>
+      <div class="field"><label for="l-end">結束</label><input type="time" id="l-end"></div>
+    </div>
+    <div class="field"><label for="l-note">問題／明日計畫</label><textarea id="l-note"></textarea></div>
+  </form>
+
+  <div class="so-foot">
+    <button class="btn btn-danger" type="button" id="so-delete">刪除</button>
+    <span class="spacer"></span>
+    <button class="btn" type="button" data-action="close-so">取消</button>
+    <button class="btn btn-primary" type="submit" id="so-save" form="todo-form">儲存</button>
+  </div>
+</aside>
+<datalist id="proj-list"></datalist>
+
+<div class="toast" id="toast" role="status" aria-live="polite">
+  <span class="toast-msg" id="toast-msg"></span>
+  <button type="button" id="toast-action" hidden></button>
+</div>
+
+
+<script type="module" src="/app.js"></script>
+</body>
+</html>

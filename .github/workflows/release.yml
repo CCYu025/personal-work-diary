@@ -1,0 +1,49 @@
+name: Release
+
+# CD：推一個 v 開頭的 tag（例如 v0.1.0）就自動：跑測試 → 打包 zip → 建立 GitHub Release。
+# 這是單機本地 App，沒有伺服器可以部署；「發行」就是產生一包下載解壓縮、雙擊 start.bat 就能用的 zip。
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: 確認 tag 跟 package.json 的版本一致
+        run: |
+          PKG="v$(node -p "require('./package.json').version")"
+          if [ "$PKG" != "$GITHUB_REF_NAME" ]; then
+            echo "tag 是 $GITHUB_REF_NAME，但 package.json 是 $PKG。先用 PR 改版本號再打 tag。"
+            exit 1
+          fi
+
+      - run: npm ci
+
+      - run: npm run check
+
+      - run: npm test
+
+      - name: 打包
+        run: |
+          mkdir -p dist
+          git archive --format=zip --prefix=personal-work-diary/ \
+            -o "dist/personal-work-diary-${GITHUB_REF_NAME}.zip" HEAD \
+            backend frontend scripts package.json package-lock.json start.bat .env.example README.md
+
+      - name: 建立 GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/*.zip --title "$GITHUB_REF_NAME" --generate-notes
