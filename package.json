@@ -1,6 +1,6 @@
 {
   "name": "personal-work-diary",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "個人工作日誌 — 待辦與每日工作紀錄（單人、單機本地執行）",
   "type": "module",
   "private": true,
