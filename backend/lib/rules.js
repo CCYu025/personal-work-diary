@@ -182,3 +182,132 @@ export function parseTimeRange(raw) {
 export function nextId(list) {
   return list.reduce((max, r) => Math.max(max, r.id || 0), 0) + 1;
 }
+
+// ---------- 報表 ----------
+// 日期一律用 UTC 運算：輸入輸出都是 YYYY-MM-DD 字串，跟機器時區無關。
+
+function shiftDate(s, n) {
+  const [y, m, d] = s.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
+}
+
+function weekdayOf(s) {
+  const [y, m, d] = s.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+}
+
+export function weekdayLabel(s) {
+  return "日一二三四五六"[weekdayOf(s)];
+}
+
+export const REPORT_PRESETS = ["today", "week", "lastweek", "month"];
+
+/** 快速期間：今天／本週（週一到週日）／上週／本月 */
+export function reportPeriod(preset, today) {
+  const monday = shiftDate(today, -((weekdayOf(today) + 6) % 7));
+  switch (preset) {
+    case "today":
+      return { start: today, end: today };
+    case "week":
+      return { start: monday, end: shiftDate(monday, 6) };
+    case "lastweek":
+      return { start: shiftDate(monday, -7), end: shiftDate(monday, -1) };
+    case "month": {
+      const [y, m] = today.split("-").map(Number);
+      return { start: `${today.slice(0, 7)}-01`, end: new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10) };
+    }
+    default:
+      return null;
+  }
+}
+
+/** 依期間決定報表名稱：日報／週報（週一到週日）／月報（整個月）／其他一律「報告」 */
+export function reportKind(start, end) {
+  if (start === end) return "日報";
+  if (weekdayOf(start) === 1 && daysBetween(start, end) === 6) return "週報";
+  if (start.endsWith("-01") && start.slice(0, 7) === end.slice(0, 7) && shiftDate(end, 1).endsWith("-01")) return "月報";
+  return "報告";
+}
+
+const RAG_ORDER = { red: 0, amber: 1, green: 2 };
+
+/**
+ * 主管看的工作報表（進度／計畫／問題）。只用現有欄位計算，不需要另外填任何東西。
+ *
+ * - 本期完成：狀態「完成」且完成日落在期間內
+ * - 未完成：建立日不晚於期間結束、還沒完成也沒取消。**狀態是產生報表當下的狀態**，
+ *   App 沒有保存狀態的歷史紀錄，報表上會註明
+ * - 需要協助：逾期（不論狀態）＋ 等待中（沒逾期的）＋ 期間內日誌的「問題／明日計畫」
+ * - 專案燈號：有逾期 → red（落後）；有等待中 → amber（注意）；其他 → green（正常）
+ * - 投入用「有紀錄的天數」，不加總時段（整天待命的紀錄會跟其他工作重疊，加總沒有意義）
+ */
+export function buildReport({ todos = [], logs = [] }, start, end, today) {
+  const inRange = (d) => Boolean(d) && d >= start && d <= end;
+
+  // 舊到新：先依時段排好，再用穩定排序把日期改成升冪
+  const periodLogs = sortLogs(logs.filter((l) => inRange(l.date))).sort((a, b) =>
+    a.date < b.date ? -1 : a.date > b.date ? 1 : 0,
+  );
+  const days = [];
+  for (const l of periodLogs) {
+    const last = days[days.length - 1];
+    if (last && last.date === l.date) last.logs.push(l);
+    else days.push({ date: l.date, logs: [l] });
+  }
+
+  const completed = todos
+    .filter((t) => t.status === "完成" && inRange(t.done))
+    .sort((a, b) => (a.done < b.done ? -1 : a.done > b.done ? 1 : (a.id || 0) - (b.id || 0)));
+  const open = sortTodos(todos.filter((t) => !isClosed(t.status) && t.created <= end), today);
+  const overdue = open.filter((t) => isOverdue(t, today));
+  const waiting = open.filter((t) => t.status === "等待中" && !isOverdue(t, today));
+  const notes = periodLogs.filter((l) => l.note);
+
+  const names = [];
+  for (const p of [...periodLogs.map((l) => l.project), ...completed.map((t) => t.project), ...open.map((t) => t.project)]) {
+    if (!names.includes(p)) names.push(p);
+  }
+  const projects = names
+    .map((name) => {
+      const mine = open.filter((t) => t.project === name);
+      const projectLogs = periodLogs.filter((l) => l.project === name);
+      const overdueCount = mine.filter((t) => isOverdue(t, today)).length;
+      const waitingCount = mine.filter((t) => t.status === "等待中").length;
+      return {
+        name,
+        rag: overdueCount ? "red" : waitingCount ? "amber" : "green",
+        overdue: overdueCount,
+        waiting: waitingCount,
+        done: completed.filter((t) => t.project === name).length,
+        open: mine.length,
+        days: new Set(projectLogs.map((l) => l.date)).size,
+        logs: projectLogs.length,
+      };
+    })
+    .sort((a, b) => RAG_ORDER[a.rag] - RAG_ORDER[b.rag] || b.days - a.days || b.logs - a.logs);
+
+  const logProjects = new Set(periodLogs.map((l) => l.project));
+  return {
+    start,
+    end,
+    kind: reportKind(start, end),
+    summary: {
+      workDays: days.length,
+      logs: periodLogs.length,
+      completed: completed.length,
+      open: open.length,
+      waiting: open.filter((t) => t.status === "等待中").length,
+      overdue: overdue.length,
+    },
+    projects,
+    overdue,
+    waiting,
+    notes,
+    completed,
+    open,
+    days,
+    // 整段期間只有一個專案時，每日紀錄就不用再印一欄專案（有值才顯示，跟產線日誌報表同一個原則）
+    singleProject: logProjects.size === 1 ? [...logProjects][0] : null,
+    hasNotes: notes.length > 0,
+  };
+}
