@@ -61,7 +61,7 @@ const STORE = {
 test("buildReport：期間篩選、摘要數字", () => {
   const r = buildReport(STORE, "2026-09-28", "2026-10-04", TODAY);
   assert.equal(r.kind, "週報");
-  assert.deepEqual(r.summary, { workDays: 3, logs: 4, completed: 1, open: 4, waiting: 2, overdue: 2 });
+  assert.deepEqual(r.summary, { workDays: 3, logs: 4, projects: 2, notes: 1, completed: 1, open: 4, waiting: 2, overdue: 2 });
   assert.deepEqual(r.completed.map((t) => t.id), [2]);
   // 未完成：逾期的排最前面；取消和期間結束後才建立的不算
   assert.deepEqual(r.open.map((t) => t.id), [3, 5, 4, 6]);
@@ -114,8 +114,38 @@ test("buildReport：只有等待中沒有逾期 → amber；整段期間只有�
 
 test("buildReport：空的期間不會壞", () => {
   const r = buildReport({ todos: [], logs: [] }, "2026-01-05", "2026-01-11", TODAY);
-  assert.deepEqual(r.summary, { workDays: 0, logs: 0, completed: 0, open: 0, waiting: 0, overdue: 0 });
+  assert.deepEqual(r.summary, { workDays: 0, logs: 0, projects: 0, notes: 0, completed: 0, open: 0, waiting: 0, overdue: 0 });
   assert.deepEqual(r.projects, []);
   assert.deepEqual(r.days, []);
   assert.equal(r.singleProject, null);
+});
+
+test("usesTodos：期間內有完成的、或期間結束時還沒完成的待辦，才用完整版面", () => {
+  const logs = [log({ id: 1, date: "2026-09-29" })];
+  const week = (todos) => buildReport({ todos, logs }, "2026-09-28", "2026-10-04", TODAY).usesTodos;
+
+  assert.equal(week([]), false, "完全沒有待辦");
+  assert.equal(week([todo({ id: 1, status: "完成", done: "2026-09-17" })]), false, "只有更早以前完成的");
+  assert.equal(week([todo({ id: 1, status: "取消" })]), false, "只有取消的");
+  assert.equal(week([todo({ id: 1, created: "2026-10-10" })]), false, "期間結束之後才建立的");
+  assert.equal(week([todo({ id: 1, status: "完成", done: "2026-10-01" })]), true, "期間內完成");
+  assert.equal(week([todo({ id: 1, created: "2026-08-01", status: "進行中" })]), true, "很早建立、到現在還沒完成");
+});
+
+test("只用日誌的期間：問題數來自日誌，待辦數字全是 0", () => {
+  const r = buildReport(
+    {
+      todos: [todo({ id: 1, status: "完成", done: "2026-09-17" })],
+      logs: [
+        log({ id: 1, date: "2026-09-29", project: "機械手臂", note: "F4 模具卡" }),
+        log({ id: 2, date: "2026-09-30", project: "機械手臂" }),
+      ],
+    },
+    "2026-09-28",
+    "2026-10-04",
+    TODAY,
+  );
+  assert.equal(r.usesTodos, false);
+  assert.deepEqual(r.summary, { workDays: 2, logs: 2, projects: 1, notes: 1, completed: 0, open: 0, waiting: 0, overdue: 0 });
+  assert.deepEqual(r.projects.map((p) => [p.name, p.days, p.logs]), [["機械手臂", 2, 2]]);
 });

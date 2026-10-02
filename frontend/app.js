@@ -311,12 +311,119 @@ function renderReport() {
   const name = $("#r-name").value.trim();
   const stamp = nowStamp();
   const range = start === end ? fullDate(start) : `${fullDate(start)} ～ ${fullDate(end)}`;
-  const sec = (n, title, note = "") =>
-    `<h3 class="rp-sec-title"><span>${n}、${title}</span>${note ? `<span class="note">${note}</span>` : ""}</h3>`;
   const kpi = (k, v, unit, alert) =>
     `<div class="rp-kpi${alert ? " alert" : ""}"><div class="k">${k}</div><div class="v">${v}<small>${unit}</small></div></div>`;
   const statusText = (t) => (isOverdue(t, now) ? `▲ 逾期 ${daysBetween(t.due, now)} 天` : t.status === "等待中" ? "◆ 等待中" : esc(t.status));
   const maxDays = Math.max(1, ...r.projects.map((p) => p.days));
+  const bar = (p) =>
+    `<div class="bar"><div class="bar-track"><div class="bar-fill" style="width:${Math.round((p.days / maxDays) * 100)}%"></div></div><span class="bar-val">${p.days} 天</span></div>`;
+  const noteItem = (l) =>
+    `<li class="rp-issue"><span class="flag">・ ${md(l.date)} 日誌</span><div><div class="what">${esc(l.note)}</div><div class="why">${esc(l.project)}・${esc(l.content)}</div></div></li>`;
+
+  // 兩種版面（見 CLAUDE.md）：這段期間有相關待辦 → 完整版；沒有 → 只看日誌的版面，
+  // 不印一排 0 的待辦數字、不印沒有根據的「● 正常」燈號、不印空的完成／進行中區塊。
+  const kpis = r.usesTodos
+    ? [
+        kpi("工作天數", r.summary.workDays, "天"),
+        kpi("工作紀錄", r.summary.logs, "筆"),
+        kpi("本期完成", r.summary.completed, "件"),
+        kpi("未完成", r.summary.open, "件"),
+        kpi("等待中", r.summary.waiting, "件"),
+        kpi("逾期", r.summary.overdue, "件", r.summary.overdue > 0),
+      ]
+    : [
+        kpi("工作天數", r.summary.workDays, "天"),
+        kpi("工作紀錄", r.summary.logs, "筆"),
+        kpi("專案", r.summary.projects, "個"),
+        kpi("記下的問題", r.summary.notes, "則"),
+      ];
+
+  const sections = [];
+
+  if (r.usesTodos) {
+    sections.push({
+      title: "專案進度總覽",
+      note: "▲ 有逾期　◆ 有等待中　● 正常",
+      body: `<table class="rp-table">
+        <thead><tr><th>專案</th><th>狀態</th><th class="num">本期完成</th><th class="num">未完成</th><th>本期投入（工作天數）</th></tr></thead>
+        <tbody>${r.projects.map((p) => `<tr>
+          <td class="item">${esc(p.name)}</td>
+          <td><span class="rag">${RAG_LABEL[p.rag]}</span>${p.overdue ? `<span class="rag-why">${p.overdue} 件逾期</span>` : p.waiting ? `<span class="rag-why">${p.waiting} 件等待中</span>` : ""}</td>
+          <td class="num">${p.done}</td>
+          <td class="num">${p.open}</td>
+          <td>${bar(p)}</td>
+        </tr>`).join("")}</tbody></table>`,
+    });
+
+    const issues = [
+      ...r.overdue.map((t) => `<li class="rp-issue"><span class="flag">▲ 逾期 ${daysBetween(t.due, now)} 天</span><div><div class="what">${esc(t.content)}</div><div class="why">${esc(t.project)}・期限 ${md(t.due)}・${t.note ? esc(t.note) : `目前「${esc(t.status)}」`}</div></div></li>`),
+      ...r.waiting.map((t) => `<li class="rp-issue"><span class="flag">◆ 等待中</span><div><div class="what">${esc(t.content)}</div><div class="why">${esc(t.project)}${t.due ? `・期限 ${md(t.due)}` : ""}${t.note ? `・${esc(t.note)}` : ""}</div></div></li>`),
+      ...r.notes.map(noteItem),
+    ];
+    // 完整版的空區塊保留「本期沒有…」：有在用待辦時，「這週沒完成任何事」本身就是主管該知道的資訊
+    sections.push({
+      title: "需要協助與風險事項",
+      note: "逾期、等待他人、日誌裡記下的問題",
+      body: issues.length ? `<ul class="rp-issues">${issues.join("")}</ul>` : `<p class="rp-empty">本期沒有逾期、等待中或記錄下來的問題。</p>`,
+    });
+    sections.push({
+      title: "本期完成",
+      body: r.completed.length ? `<table class="rp-table">
+        <thead><tr><th>完成日</th><th>項目</th><th>專案</th><th>備註</th></tr></thead>
+        <tbody>${r.completed.map((t) => `<tr><td class="date">${md(t.done)}</td><td class="item">${esc(t.content)}</td><td class="tag">${esc(t.project)}</td><td class="sub">${esc(t.note) || "—"}</td></tr>`).join("")}</tbody></table>`
+        : `<p class="rp-empty">本期沒有完成的待辦。</p>`,
+    });
+    sections.push({
+      title: "進行中與下期計畫",
+      note: "依急迫程度排序",
+      body: r.open.length ? `<table class="rp-table">
+        <thead><tr><th>項目</th><th>專案</th><th>狀態</th><th>期限</th><th>下一步／備註</th></tr></thead>
+        <tbody>${r.open.map((t) => `<tr><td class="item">${esc(t.content)}</td><td class="tag">${esc(t.project)}</td><td class="tag">${statusText(t)}</td><td class="date">${t.due ? md(t.due) : "—"}</td><td class="sub">${esc(t.note) || "—"}</td></tr>`).join("")}</tbody></table>`
+        : `<p class="rp-empty">沒有未完成的待辦。</p>`,
+    });
+  } else {
+    if (r.projects.length) {
+      sections.push({
+        title: "各專案投入",
+        body: `<table class="rp-table">
+          <thead><tr><th>專案</th><th class="num">工作紀錄</th><th>本期投入（工作天數）</th></tr></thead>
+          <tbody>${r.projects.map((p) => `<tr><td class="item">${esc(p.name)}</td><td class="num">${p.logs} 筆</td><td>${bar(p)}</td></tr>`).join("")}</tbody></table>`,
+      });
+    }
+    // 只看日誌時，沒寫「問題／明日計畫」就整區不印
+    if (r.notes.length) {
+      sections.push({
+        title: "問題與後續計畫",
+        note: "取自日誌的「問題／明日計畫」",
+        body: `<ul class="rp-issues">${r.notes.map(noteItem).join("")}</ul>`,
+      });
+    }
+  }
+
+  const cols = 2 + (r.singleProject ? 0 : 1) + (r.hasNotes ? 1 : 0);
+  sections.push({
+    title: "每日工作紀錄",
+    note: r.singleProject ? `本期紀錄皆為「${esc(r.singleProject)}」` : "",
+    body: r.days.length ? `<table class="rp-table">
+      <thead><tr><th>時段</th>${r.singleProject ? "" : "<th>專案</th>"}<th>工作內容</th>${r.hasNotes ? "<th>問題／明日計畫</th>" : ""}</tr></thead>
+      ${r.days.map((d) => `<tbody>
+        <tr class="rp-day-head"><td colspan="${cols}">${fullDate(d.date)}<span class="cnt">${d.logs.length} 筆</span></td></tr>
+        ${d.logs.map((l) => `<tr class="rp-log">
+          <td class="date">${l.start ? `${esc(l.start)}${l.end ? "–" + esc(l.end) : ""}` : "—"}</td>
+          ${r.singleProject ? "" : `<td class="tag">${esc(l.project)}</td>`}
+          <td>${esc(l.content)}</td>
+          ${r.hasNotes ? `<td class="sub">${esc(l.note)}</td>` : ""}
+        </tr>`).join("")}
+      </tbody>`).join("")}
+    </table>` : `<p class="rp-empty">這段期間沒有工作紀錄。</p>`,
+  });
+
+  const NUM = "一二三四五六七八九十";
+  const body = sections.map((s, i) => `
+    <section class="rp-sec">
+      <h3 class="rp-sec-title"><span>${NUM[i]}、${s.title}</span>${s.note ? `<span class="note">${s.note}</span>` : ""}</h3>
+      ${s.body}
+    </section>`).join("");
 
   const head = `
     <header class="rp-head">
@@ -328,80 +435,11 @@ function renderReport() {
         <span><b>產出</b>${stamp}</span>
       </div>
     </header>
-    <div class="rp-kpis">
-      ${kpi("工作天數", r.summary.workDays, "天")}
-      ${kpi("工作紀錄", r.summary.logs, "筆")}
-      ${kpi("本期完成", r.summary.completed, "件")}
-      ${kpi("未完成", r.summary.open, "件")}
-      ${kpi("等待中", r.summary.waiting, "件")}
-      ${kpi("逾期", r.summary.overdue, "件", r.summary.overdue > 0)}
-    </div>`;
-
-  const overview = `
-    <section class="rp-sec">
-      ${sec("一", "專案進度總覽", "▲ 有逾期　◆ 有等待中　● 正常")}
-      ${r.projects.length ? `<table class="rp-table">
-        <thead><tr><th>專案</th><th>狀態</th><th class="num">本期完成</th><th class="num">未完成</th><th>本期投入（工作天數）</th></tr></thead>
-        <tbody>${r.projects.map((p) => `<tr>
-          <td class="item">${esc(p.name)}</td>
-          <td><span class="rag">${RAG_LABEL[p.rag]}</span>${p.overdue ? `<span class="rag-why">${p.overdue} 件逾期</span>` : p.waiting ? `<span class="rag-why">${p.waiting} 件等待中</span>` : ""}</td>
-          <td class="num">${p.done}</td>
-          <td class="num">${p.open}</td>
-          <td><div class="bar"><div class="bar-track"><div class="bar-fill" style="width:${Math.round((p.days / maxDays) * 100)}%"></div></div><span class="bar-val">${p.days} 天</span></div></td>
-        </tr>`).join("")}</tbody></table>` : `<p class="rp-empty">這段期間沒有任何紀錄或待辦。</p>`}
-    </section>`;
-
-  const issues = [
-    ...r.overdue.map((t) => `<li class="rp-issue"><span class="flag">▲ 逾期 ${daysBetween(t.due, now)} 天</span><div><div class="what">${esc(t.content)}</div><div class="why">${esc(t.project)}・期限 ${md(t.due)}・${t.note ? esc(t.note) : `目前「${esc(t.status)}」`}</div></div></li>`),
-    ...r.waiting.map((t) => `<li class="rp-issue"><span class="flag">◆ 等待中</span><div><div class="what">${esc(t.content)}</div><div class="why">${esc(t.project)}${t.due ? `・期限 ${md(t.due)}` : ""}${t.note ? `・${esc(t.note)}` : ""}</div></div></li>`),
-    ...r.notes.map((l) => `<li class="rp-issue"><span class="flag">・ ${md(l.date)} 日誌</span><div><div class="what">${esc(l.note)}</div><div class="why">${esc(l.project)}・${esc(l.content)}</div></div></li>`),
-  ];
-  const problems = `
-    <section class="rp-sec">
-      ${sec("二", "需要協助與風險事項", "逾期、等待他人、日誌裡記下的問題")}
-      ${issues.length ? `<ul class="rp-issues">${issues.join("")}</ul>` : `<p class="rp-empty">本期沒有逾期、等待中或記錄下來的問題。</p>`}
-    </section>`;
-
-  const done = `
-    <section class="rp-sec">
-      ${sec("三", "本期完成")}
-      ${r.completed.length ? `<table class="rp-table">
-        <thead><tr><th>完成日</th><th>項目</th><th>專案</th><th>備註</th></tr></thead>
-        <tbody>${r.completed.map((t) => `<tr><td class="date">${md(t.done)}</td><td class="item">${esc(t.content)}</td><td class="tag">${esc(t.project)}</td><td class="sub">${esc(t.note) || "—"}</td></tr>`).join("")}</tbody></table>`
-        : `<p class="rp-empty">本期沒有完成的待辦。</p>`}
-    </section>`;
-
-  const plans = `
-    <section class="rp-sec">
-      ${sec("四", "進行中與下期計畫", "依急迫程度排序")}
-      ${r.open.length ? `<table class="rp-table">
-        <thead><tr><th>項目</th><th>專案</th><th>狀態</th><th>期限</th><th>下一步／備註</th></tr></thead>
-        <tbody>${r.open.map((t) => `<tr><td class="item">${esc(t.content)}</td><td class="tag">${esc(t.project)}</td><td class="tag">${statusText(t)}</td><td class="date">${t.due ? md(t.due) : "—"}</td><td class="sub">${esc(t.note) || "—"}</td></tr>`).join("")}</tbody></table>`
-        : `<p class="rp-empty">沒有未完成的待辦。</p>`}
-    </section>`;
-
-  const cols = 2 + (r.singleProject ? 0 : 1) + (r.hasNotes ? 1 : 0);
-  const daily = `
-    <section class="rp-sec">
-      ${sec("五", "每日工作紀錄", r.singleProject ? `本期紀錄皆為「${esc(r.singleProject)}」` : "")}
-      ${r.days.length ? `<table class="rp-table">
-        <thead><tr><th>時段</th>${r.singleProject ? "" : "<th>專案</th>"}<th>工作內容</th>${r.hasNotes ? "<th>問題／明日計畫</th>" : ""}</tr></thead>
-        ${r.days.map((d) => `<tbody>
-          <tr class="rp-day-head"><td colspan="${cols}">${fullDate(d.date)}<span class="cnt">${d.logs.length} 筆</span></td></tr>
-          ${d.logs.map((l) => `<tr class="rp-log">
-            <td class="date">${l.start ? `${esc(l.start)}${l.end ? "–" + esc(l.end) : ""}` : "—"}</td>
-            ${r.singleProject ? "" : `<td class="tag">${esc(l.project)}</td>`}
-            <td>${esc(l.content)}</td>
-            ${r.hasNotes ? `<td class="sub">${esc(l.note)}</td>` : ""}
-          </tr>`).join("")}
-        </tbody>`).join("")}
-      </table>` : `<p class="rp-empty">這段期間沒有工作紀錄。</p>`}
-    </section>`;
-
+    <div class="rp-kpis${kpis.length === 4 ? " n4" : ""}">${kpis.join("")}</div>`;
   const sign = $("#r-sign").checked ? `<div class="rp-sign"><div>報告人</div><div>主管審閱</div><div>日期</div></div>` : "";
-  const foot = `<div class="rp-foot"><span>個人工作日誌・${stamp} 產出</span><span>待辦狀態以產出當下為準</span></div>`;
+  const foot = `<div class="rp-foot"><span>個人工作日誌・${stamp} 產出</span>${r.usesTodos ? "<span>待辦狀態以產出當下為準</span>" : ""}</div>`;
 
-  $("#report-output").innerHTML = head + overview + problems + done + plans + daily + sign + foot;
+  $("#report-output").innerHTML = head + body + sign + foot;
   state.reportReady = true;
   $("#r-print").disabled = false;
   $("#r-window").disabled = false;

@@ -358,11 +358,17 @@
   .rp-kpi .v{ font-family:var(--font-mono); font-size:26px; font-weight:600; line-height:1.15; margin-top:4px; font-variant-numeric:tabular-nums; }
   .rp-kpi .v small{ font-family:var(--font-sans); font-size:12px; font-weight:700; color:var(--paper-ink-2); margin-left:3px; }
   .rp-kpi.alert .v::before{ content:"▲ "; font-size:15px; vertical-align:4px; }
+  .rp-kpis.n4{ grid-template-columns:repeat(4,1fr); }
   @container (max-width: 640px){
     .rp-kpis{ grid-template-columns:repeat(3,1fr); }
-    .rp-kpi:nth-child(3n+1){ border-left:none; padding-left:0; }
-    .rp-kpi:nth-child(-n+3){ border-bottom:1px solid var(--paper-hair); }
+    .rp-kpis:not(.n4) .rp-kpi:nth-child(3n+1){ border-left:none; padding-left:0; }
+    .rp-kpis:not(.n4) .rp-kpi:nth-child(-n+3){ border-bottom:1px solid var(--paper-hair); }
     .rp-issue{ grid-template-columns:minmax(0,1fr); gap:2px; }
+  }
+  @container (max-width: 440px){
+    .rp-kpis.n4{ grid-template-columns:repeat(2,1fr); }
+    .rp-kpis.n4 .rp-kpi:nth-child(odd){ border-left:none; padding-left:0; }
+    .rp-kpis.n4 .rp-kpi:nth-child(-n+2){ border-bottom:1px solid var(--paper-hair); }
   }
   .rp-sec{ margin-top:30px; }
   .rp-sec-title{

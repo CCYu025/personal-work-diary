@@ -240,6 +240,10 @@ const RAG_ORDER = { red: 0, amber: 1, green: 2 };
  * - 需要協助：逾期（不論狀態）＋ 等待中（沒逾期的）＋ 期間內日誌的「問題／明日計畫」
  * - 專案燈號：有逾期 → red（落後）；有等待中 → amber（注意）；其他 → green（正常）
  * - 投入用「有紀錄的天數」，不加總時段（整天待命的紀錄會跟其他工作重疊，加總沒有意義）
+ * - usesTodos：這段期間有沒有「相關的待辦」（期間內完成的，或期間結束時還沒完成的）。
+ *   沒有的話畫面改用只看日誌的版面：不印待辦數字、不印燈號、不印完成／進行中區塊。
+ *   判斷看「這段期間」，不是「資料裡有沒有任何待辦」——偶爾開一個待辦，不該讓之後每一期
+ *   都印出空的待辦區塊；燈號在沒有待辦時也不能顯示「正常」，那是資料撐不起來的話。
  */
 export function buildReport({ todos = [], logs = [] }, start, end, today) {
   const inRange = (d) => Boolean(d) && d >= start && d <= end;
@@ -291,9 +295,12 @@ export function buildReport({ todos = [], logs = [] }, start, end, today) {
     start,
     end,
     kind: reportKind(start, end),
+    usesTodos: completed.length > 0 || open.length > 0,
     summary: {
       workDays: days.length,
       logs: periodLogs.length,
+      projects: logProjects.size,
+      notes: notes.length,
       completed: completed.length,
       open: open.length,
       waiting: open.filter((t) => t.status === "等待中").length,
