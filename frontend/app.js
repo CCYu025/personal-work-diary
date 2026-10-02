@@ -264,7 +264,6 @@ function renderLogs() {
 // ---------- 報表 ----------
 // 要算什麼全在 rules.js 的 buildReport（有單元測試），這裡只負責排版。
 // 區塊順序是刻意的：主管可能只看第一頁，所以「需要協助」排在「本期完成」前面。
-const LS_NAME = "pwd.reportName";
 const LS_SIGN = "pwd.reportSign";
 const RAG_LABEL = { red: "▲ 落後", amber: "◆ 注意", green: "● 正常" };
 const prefs = {
@@ -274,7 +273,6 @@ const prefs = {
 
 function enterReport() {
   if (!$("#r-start").value) {
-    $("#r-name").value = prefs.get(LS_NAME) || "";
     $("#r-sign").checked = prefs.get(LS_SIGN) === "1"; // 簽核欄預設不顯示
     applyReportPreset("week");
   } else {
@@ -308,7 +306,6 @@ function renderReport() {
 
   const now = today();
   const r = buildReport(data, start, end, now);
-  const name = $("#r-name").value.trim();
   const stamp = nowStamp();
   const range = start === end ? fullDate(start) : `${fullDate(start)} ～ ${fullDate(end)}`;
   const kpi = (k, v, unit, alert) =>
@@ -431,7 +428,6 @@ function renderReport() {
       <h2>個人工作${r.kind}</h2>
       <div class="rp-meta">
         <span><b>期間</b>${esc(range)}</span>
-        <span><b>報告人</b>${name ? esc(name) : "＿＿＿＿"}</span>
         <span><b>產出</b>${stamp}</span>
       </div>
     </header>
@@ -464,10 +460,6 @@ $("#r-generate").addEventListener("click", () => { markPreset(null); renderRepor
 $("#r-print").addEventListener("click", () => window.print());
 $("#r-window").addEventListener("click", openReportWindow);
 ["#r-start", "#r-end"].forEach((s) => $(s).addEventListener("change", () => markPreset(null)));
-$("#r-name").addEventListener("input", (e) => {
-  prefs.set(LS_NAME, e.target.value.trim());
-  if (state.reportReady) renderReport();
-});
 $("#r-sign").addEventListener("change", (e) => {
   prefs.set(LS_SIGN, e.target.checked ? "1" : "0");
   if (state.reportReady) renderReport();
