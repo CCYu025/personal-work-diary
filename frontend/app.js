@@ -342,10 +342,10 @@ function renderReport() {
 
   if (r.usesTodos) {
     sections.push({
-      title: "專案進度總覽",
+      title: "工作項目進度總覽",
       note: "▲ 有逾期　◆ 有等待中　● 正常",
       body: `<table class="rp-table">
-        <thead><tr><th>專案</th><th>狀態</th><th class="num">本期完成</th><th class="num">未完成</th><th>本期投入（工作天數）</th></tr></thead>
+        <thead><tr><th>工作項目</th><th>狀態</th><th class="num">本期完成</th><th class="num">未完成</th><th>本期投入（工作天數）</th></tr></thead>
         <tbody>${r.projects.map((p) => `<tr>
           <td class="item">${esc(p.name)}</td>
           <td><span class="rag">${RAG_LABEL[p.rag]}</span>${p.overdue ? `<span class="rag-why">${p.overdue} 件逾期</span>` : p.waiting ? `<span class="rag-why">${p.waiting} 件等待中</span>` : ""}</td>
@@ -384,9 +384,9 @@ function renderReport() {
   } else {
     if (r.projects.length) {
       sections.push({
-        title: "各專案投入",
+        title: "各工作項目投入",
         body: `<table class="rp-table">
-          <thead><tr><th>專案</th><th class="num">工作紀錄</th><th>本期投入（工作天數）</th></tr></thead>
+          <thead><tr><th>工作項目</th><th class="num">工作紀錄</th><th>本期投入（工作天數）</th></tr></thead>
           <tbody>${r.projects.map((p) => `<tr><td class="item">${esc(p.name)}</td><td class="num">${p.logs} 筆</td><td>${bar(p)}</td></tr>`).join("")}</tbody></table>`,
       });
     }
