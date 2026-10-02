@@ -334,7 +334,7 @@ function renderReport() {
     : [
         kpi("工作天數", r.summary.workDays, "天"),
         kpi("工作紀錄", r.summary.logs, "筆"),
-        kpi("專案", r.summary.projects, "個"),
+        kpi("工作項目", r.summary.projects, "個"),
         kpi("記下的問題", r.summary.notes, "則"),
       ];
 
