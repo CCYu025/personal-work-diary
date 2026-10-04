@@ -20,5 +20,6 @@ dist/
 .DS_Store
 Thumbs.db
 
-# Claude Code 本機設定
-.claude/
+# Claude Code 本機設定（agents/ 是專案共用的驗證者定義，要追蹤）
+.claude/*
+!.claude/agents/
