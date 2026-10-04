@@ -139,10 +139,27 @@ gh pr merge --squash --delete-branch
 發行：PR 改 `package.json` 的 `version` → 合併 → 在 `main` 打 `v<版本>` tag 並 push →
 `release.yml` 驗證版本一致、跑測試、打包 zip、建立 GitHub Release。
 
+### 合併前的文件檢查
+
+文件常常落後程式碼，事後才另開 PR 補（要多走一次 PR + CI）。所以**使用者說「合併」時，
+執行 `gh pr merge` 之前先做這一步**，需要補的內容直接進同一個 PR：
+
+1. 對照這個 PR 的完整 diff（`git diff main...HEAD`），逐項判斷下列文件是否需要更新：
+   - `CLAUDE.md`：「關鍵檔案」表、「核心不變量」、「測試」與手動驗證的說明
+   - `AGENTS.md`：跟 `CLAUDE.md` 同步更新（兩份內容相同）
+   - `README.md`：功能列表與快速啟動
+   - `backend/data/schema.md`：只有動到欄位或資料結構時才需要
+2. 回報兩份清單：「已更新」與「不需更新（理由）」。不能只說「文件沒問題」——要讓使用者
+   看得出每一份都真的檢查過。
+3. 需要補的內容 commit 到同一個 PR 分支、push、等 CI 綠燈，再合併。
+4. 檢查中如果發現還要改程式碼（不只是文件），先暫停問使用者，不要順手改。
+
 ## Claude Code 執行原則
 
 使用者確認方向後直接做，不用每一步都問。只在這些情況先停下來確認：
 
 - 會覆蓋或刪除 `DATA_DIR` 裡的真實資料（`data.json`、使用者的 Excel）
 - `git push` 到遠端、建立或修改 GitHub repo 設定、打 release tag
+  （例外：使用者說「合併」時，視同授權把**純文件**的補充 commit push 到該 PR 分支；
+  要動到程式碼的修改仍然要先問）
 - 修改範圍明顯超出討論內容，或要改上面任何一條核心不變量
